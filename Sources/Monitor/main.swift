@@ -16,7 +16,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.onAdjustment = { [weak self] name, symbol, value, maximum in self?.showHUD(name, symbol, value, maximum) }
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = NSImage(systemSymbolName: "display", accessibilityDescription: "Monitor")
-        item.button?.toolTip = "Monitor · 볼륨과 밝기"
+        item.button?.toolTip = model.text("Monitor · Volume and brightness")
+        model.onLanguageChange = { [weak self] in
+            guard let self else { return }
+            self.item.button?.toolTip = self.model.text("Monitor · Volume and brightness")
+            self.item.button?.setAccessibilityLabel(self.model.text("Monitor · Volume and brightness"))
+        }
         item.button?.target = self; item.button?.action = #selector(toggle)
         popover.behavior = .transient
         popover.contentViewController = NSHostingController(rootView: PanelView(model: model))
@@ -77,9 +82,14 @@ if CommandLine.arguments.contains("--verify-volume-step") {
     _ = NSApplication.shared
     let path = CommandLine.arguments[index + 1]
     try MainActor.assumeIsolated {
-        let view = NSHostingView(rootView: PanelView(model: AppModel(preview: true)).environment(\.colorScheme, .light))
+        let model = AppModel(preview: true)
+        if let index = CommandLine.arguments.firstIndex(of: "--language"), CommandLine.arguments.count > index + 1 {
+            model.language = AppLanguage(rawValue: CommandLine.arguments[index + 1]) ?? .english
+        }
+        let dark = CommandLine.arguments.contains("--dark")
+        let view = NSHostingView(rootView: PanelView(model: model, settings: CommandLine.arguments.contains("--settings")).environment(\.colorScheme, dark ? .dark : .light))
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 420, height: 680), styleMask: [.borderless], backing: .buffered, defer: false)
-        window.appearance = NSAppearance(named: .aqua)
+        window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
         window.contentView = view
         view.frame = NSRect(x: 0, y: 0, width: 420, height: 680)
         view.layoutSubtreeIfNeeded()

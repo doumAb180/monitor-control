@@ -4,6 +4,9 @@ on:
     tags: ['v*']
 permissions:
   contents: write
+concurrency:
+  group: monitor-releases
+  cancel-in-progress: false
 jobs:
   release:
     runs-on: macos-15
@@ -19,3 +22,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: gh release create "$RELEASE_TAG" dist/*.dmg dist/*.zip dist/*.sha256 --verify-tag --generate-notes --title "Monitor $RELEASE_TAG" --prerelease
+      - name: Update Homebrew cask
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          git fetch origin main
+          git checkout -B main origin/main
+          python3 scripts/update-cask.py "${RELEASE_TAG#v}" "dist/Monitor-${RELEASE_TAG#v}-arm64.dmg"
+          if git diff --quiet -- Casks/monitor.rb; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Casks/monitor.rb
+          git commit -m "chore: update Homebrew cask to ${RELEASE_TAG}"
+          git push origin main

@@ -16,6 +16,36 @@ final class ControlTests: XCTestCase {
         XCTAssertEqual(Level(current: 1, maximum: 100).stepped(up: false, by: 5), 0)
         XCTAssertEqual(Level(current: 20, maximum: 100).stepped(up: true, by: 2), 22)
     }
+    func testStandardModeUsesSixteenRoundedStops() {
+        var current = 0
+        var visited = [current]
+        while current < 100 {
+            current = Level(current: current, maximum: 100).stepped(up: true, mode: .standard)
+            visited.append(current)
+        }
+        XCTAssertEqual(visited, [0, 6, 13, 19, 25, 31, 38, 44, 50, 56, 63, 69, 75, 81, 88, 94, 100])
+        for prior in visited.dropLast().reversed() {
+            current = Level(current: current, maximum: 100).stepped(up: false, mode: .standard)
+            XCTAssertEqual(current, prior)
+        }
+    }
+    func testModesNeverStallAtOffGridValuesOrSmallRanges() {
+        for maximum in [8, 16, 100, 255] {
+            for current in 0...maximum {
+                let level = Level(current: current, maximum: maximum)
+                for mode in AdjustmentMode.allCases {
+                    let up = level.stepped(up: true, mode: mode)
+                    let down = level.stepped(up: false, mode: mode)
+                    if current < maximum { XCTAssertGreaterThan(up, current) }
+                    if current > 0 { XCTAssertLessThan(down, current) }
+                    XCTAssertLessThanOrEqual(up, maximum)
+                    XCTAssertGreaterThanOrEqual(down, 0)
+                }
+            }
+        }
+        XCTAssertEqual(Level(current: 7, maximum: 100).stepped(up: true, mode: .standard), 13)
+        XCTAssertEqual(Level(current: 7, maximum: 100).stepped(up: true, mode: .fine), 8)
+    }
     func testWirePackets() {
         XCTAssertEqual(DDCPacket.read(.volume), [0x82, 0x01, 0x62, 0x8f])
         XCTAssertEqual(DDCPacket.write(.volume, value: 21), [0x84, 0x03, 0x62, 0x00, 0x15, 0xcf])

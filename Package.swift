@@ -9,6 +9,7 @@ let package = Package(
         .target(name: "MonitorCore"),
         .target(name: "DDCBridge", linkerSettings: [.linkedFramework("IOKit"), .linkedFramework("CoreFoundation")]),
         .executableTarget(name: "Monitor", dependencies: ["MonitorCore", "DDCBridge"]),
-        .testTarget(name: "MonitorCoreTests", dependencies: ["MonitorCore"])
+        .testTarget(name: "MonitorCoreTests", dependencies: ["MonitorCore"]),
+        .testTarget(name: "MonitorTests", dependencies: ["Monitor"])
     ]
 )

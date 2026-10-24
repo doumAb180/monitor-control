@@ -12,30 +12,43 @@ struct DisplayState: Identifiable {
 
 final class AppModel: ObservableObject {
     @Published var displays: [DisplayState] = []
-    @Published var selectedID: String = UserDefaults.standard.string(forKey: "selectedDisplay") ?? "" {
-        didSet { if !preview { UserDefaults.standard.set(selectedID, forKey: "selectedDisplay") } }
+    @Published var selectedID: String {
+        didSet { if !preview { defaults.set(selectedID, forKey: "selectedDisplay") } }
     }
     @Published var scanning = false
-    @Published var message = "모니터를 찾고 있어요."
+    @Published private var messageText: LocalizedText = .key("Looking for your monitor…")
+    var message: String { messageText.rendered(in: language) }
+    @Published var language: AppLanguage {
+        didSet {
+            if !preview { defaults.set(language.rawValue, forKey: "appLanguage.v1") }
+            onLanguageChange?()
+        }
+    }
+    var onLanguageChange: (() -> Void)?
+    func text(_ key: String, _ arguments: String...) -> String {
+        LocalizedText.key(key, arguments.map { .verbatim($0) }).rendered(in: language)
+    }
     @Published var isError = false
     @Published var trusted = AXIsProcessTrusted()
     @Published var keysActive = false
     @Published var conflict = false
-    @Published var volumeStep = max(1, UserDefaults.standard.integer(forKey: "volumeStep")) {
-        didSet { if !preview { UserDefaults.standard.set(volumeStep, forKey: "volumeStep") } }
+    @Published var volumeMode: AdjustmentMode {
+        didSet { if !preview { defaults.set(volumeMode.rawValue, forKey: "volumeMode.v1") } }
     }
-    @Published var brightnessStep = max(1, UserDefaults.standard.integer(forKey: "brightnessStep")) {
-        didSet { if !preview { UserDefaults.standard.set(brightnessStep, forKey: "brightnessStep") } }
+    @Published var brightnessMode: AdjustmentMode {
+        didSet { if !preview { defaults.set(brightnessMode.rawValue, forKey: "brightnessMode.v1") } }
     }
-    @Published var volumeKeys = UserDefaults.standard.object(forKey: "volumeKeys") as? Bool ?? true {
-        didSet { if !preview { UserDefaults.standard.set(volumeKeys, forKey: "volumeKeys"); refreshKeyboard() } }
+    @Published var volumeKeys: Bool {
+        didSet { if !preview { defaults.set(volumeKeys, forKey: "volumeKeys"); refreshKeyboard() } }
     }
-    @Published var brightnessKeys = UserDefaults.standard.bool(forKey: "brightnessKeys") {
-        didSet { if !preview { UserDefaults.standard.set(brightnessKeys, forKey: "brightnessKeys"); refreshKeyboard() } }
+    @Published var brightnessKeys: Bool {
+        didSet { if !preview { defaults.set(brightnessKeys, forKey: "brightnessKeys"); refreshKeyboard() } }
     }
     @Published var loginEnabled = false
     var onAdjustment: ((String, String, Int, Int) -> Void)?
     let preview: Bool
+    private let defaults: UserDefaults
+    private let connectHardware: Bool
     private let io = DispatchQueue(label: "io.github.doumAb180.Monitor.ddc")
     private var devices: [String: DisplayDevice] = [:]
     private var generation = 0
@@ -50,13 +63,22 @@ final class AppModel: ObservableObject {
 
     var selected: DisplayState? { displays.first { $0.id == selectedID } }
 
-    init(preview: Bool = false) {
+    init(preview: Bool = false, defaults: UserDefaults = .standard, connectHardware: Bool = true) {
         self.preview = preview
+        self.defaults = defaults
+        self.connectHardware = connectHardware
+        language = AppLanguage(rawValue: defaults.string(forKey: "appLanguage.v1") ?? "system") ?? .system
+        selectedID = defaults.string(forKey: "selectedDisplay") ?? ""
+        volumeMode = AdjustmentMode(rawValue: defaults.string(forKey: "volumeMode.v1") ?? "") ?? (defaults.integer(forKey: "volumeStep") > 1 ? .standard : .fine)
+        brightnessMode = AdjustmentMode(rawValue: defaults.string(forKey: "brightnessMode.v1") ?? "") ?? (defaults.integer(forKey: "brightnessStep") > 1 ? .standard : .fine)
+        volumeKeys = defaults.object(forKey: "volumeKeys") as? Bool ?? true
+        brightnessKeys = defaults.bool(forKey: "brightnessKeys")
         if preview {
             displays = [.init(id: "preview", name: "LG HDR 4K", levels: [.volume: Level(current: 21, maximum: 100), .brightness: Level(current: 65, maximum: 100)])]
             selectedID = "preview"; trusted = true; keysActive = true
-            message = "한 번에 1씩, 원하는 만큼만."; return
+            messageText = .key("One step at a time. Just right."); return
         }
+        guard connectHardware else { return }
         loginEnabled = SMAppService.mainApp.status == .enabled
         keys.accepts = { [weak self] action in
             guard let self, !self.scanning, !self.conflict, let selected = self.selected else { return false }
@@ -92,8 +114,8 @@ final class AppModel: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: work)
     }
     func scan() {
-        guard !preview else { return }
-        invalidate(); scanning = true; message = "모니터를 확인하고 있어요."; isError = false
+        guard !preview, connectHardware else { return }
+        invalidate(); scanning = true; messageText = .key("Checking your monitor…"); isError = false
         let epoch = generation
         io.async { [weak self] in
             let found = DisplayDiscovery.scan()
@@ -105,15 +127,15 @@ final class AppModel: ObservableObject {
                 self.devices = Dictionary(uniqueKeysWithValues: found.map { ($0.id, $0) })
                 self.displays = states; self.scanning = false
                 if !states.contains(where: { $0.id == self.selectedID }) { self.selectedID = states.first?.id ?? "" }
-                self.message = states.isEmpty ? "연결된 DDC 모니터를 찾지 못했어요." : "한 번에 1씩, 원하는 만큼만."
+                self.messageText = .key(states.isEmpty ? "No DDC monitor found." : "One step at a time. Just right.")
                 self.refreshKeyboard()
             }
         }
     }
     func step(_ control: Control, up: Bool, fine: Bool = false) {
         guard let level = selected?.levels[control] else { return }
-        let step = fine ? 1 : (control == .volume ? volumeStep : brightnessStep)
-        set(control, value: level.stepped(up: up, by: step), showHUD: true)
+        let mode: AdjustmentMode = fine ? .fine : (control == .volume ? volumeMode : brightnessMode)
+        set(control, value: level.stepped(up: up, mode: mode), showHUD: true)
     }
     func toggleMute() {
         guard let level = selected?.levels[.volume] else { return }
@@ -137,7 +159,8 @@ final class AppModel: ObservableObject {
         let revision = (revisions[key] ?? 0) + 1
         revisions[key] = revision
         displays[index].levels[control]?.current = value
-        isError = false; message = "\(control == .volume ? "볼륨" : "밝기") \(value) 적용 중…"
+        isError = false
+        messageText = .key("Applying {0} {1}…", [.key(control == .volume ? "Volume" : "Brightness"), .verbatim(String(value))])
         if showHUD { onAdjustment?(device.name, control == .volume ? "speaker.wave.2.fill" : "sun.max.fill", value, level.maximum) }
         pending[key]?.cancel()
         tickets[key]?.cancel()
@@ -161,11 +184,11 @@ final class AppModel: ObservableObject {
                     if let actual {
                         self.displays[index].levels[control] = actual
                         self.isError = !sent || actual.current != value
-                        self.message = self.isError ? "모니터가 요청한 값을 적용하지 않았어요. 다시 확인해 주세요." : "\(control == .volume ? "볼륨" : "밝기") \(actual.current) · 적용 완료"
+                        self.messageText = self.isError ? .key("The monitor did not apply the requested value. Please check again.") : .key("{0} {1} · Applied", [.key(control == .volume ? "Volume" : "Brightness"), .verbatim(String(actual.current))])
                     } else {
                         self.displays[index].levels.removeValue(forKey: control)
                         self.isError = true
-                        self.message = "모니터 응답을 확인할 수 없어요. 다시 검색해 주세요."
+                        self.messageText = .key("No response from the monitor. Please scan again.")
                     }
                 }
             }
@@ -174,7 +197,7 @@ final class AppModel: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.08, execute: work)
     }
     func refreshKeyboard() {
-        guard !preview else { return }
+        guard !preview, connectHardware else { return }
         trusted = AXIsProcessTrusted()
         conflict = !NSRunningApplication.runningApplications(withBundleIdentifier: "app.monitorcontrol.MonitorControl").isEmpty
         if trusted && !conflict && !scanning && (volumeKeys || brightnessKeys) {
@@ -188,7 +211,7 @@ final class AppModel: ObservableObject {
         do {
             if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
             loginEnabled = SMAppService.mainApp.status == .enabled
-            if enabled && !loginEnabled { message = "시스템 설정 → 일반 → 로그인 항목에서 허용해 주세요." }
-        } catch { isError = true; message = "로그인 항목을 변경하지 못했어요: \(error.localizedDescription)" }
+            if enabled && !loginEnabled { messageText = .key("Allow Monitor in System Settings → General → Login Items.") }
+        } catch { isError = true; messageText = .key("Could not change the login item: {0}", [.verbatim(error.localizedDescription)]) }
     }
 }

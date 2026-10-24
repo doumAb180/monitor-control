@@ -6,6 +6,12 @@ let monitorAccent = Color(red: 0.34, green: 0.40, blue: 0.94)
 struct PanelView: View {
     @ObservedObject var model: AppModel
     @State private var settings = false
+    @State private var quitHovered = false
+
+    init(model: AppModel, settings: Bool = false) {
+        self.model = model
+        _settings = State(initialValue: settings)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -31,15 +37,15 @@ struct PanelView: View {
             }.frame(width: 46, height: 46)
             VStack(alignment: .leading, spacing: 3) {
                 Text("Monitor").font(.system(size: 24, weight: .bold, design: .rounded))
-                Text(settings ? "작은 차이도, 내 취향대로." : "딱 맞는 소리, 편안한 밝기.")
-                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                Text(settings ? model.text("Make every adjustment yours.") : model.text("Sound just right. Light just enough."))
+                    .font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
             }
             Spacer()
             Button { withAnimation(.easeInOut(duration: 0.15)) { settings.toggle() } } label: {
                 Image(systemName: settings ? "arrow.left" : "slider.horizontal.3")
                     .font(.system(size: 15, weight: .medium)).frame(width: 32, height: 32)
                     .background(.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 10))
-            }.buttonStyle(.plain).accessibilityLabel(settings ? "조절 화면" : "설정")
+            }.buttonStyle(.plain).fixedSize().accessibilityLabel(settings ? model.text("Controls") : model.text("Settings"))
         }
     }
 
@@ -47,31 +53,31 @@ struct PanelView: View {
         if model.scanning {
             VStack(spacing: 14) {
                 ProgressView().controlSize(.small)
-                Text("연결된 모니터를 찾고 있어요").font(.system(size: 12)).foregroundStyle(.secondary)
+                Text(model.text("Looking for connected monitors")).font(.system(size: 12)).foregroundStyle(.secondary)
             }.frame(maxWidth: .infinity, minHeight: 240)
         } else if let selected = model.selected {
             HStack(spacing: 9) {
                 Image(systemName: "display").foregroundStyle(monitorAccent)
                 if model.displays.count > 1 {
-                    Picker("모니터", selection: $model.selectedID) {
+                    Picker(model.text("Monitor"), selection: $model.selectedID) {
                         ForEach(Array(model.displays.enumerated()), id: \.element.id) { index, display in
                             Text("\(display.name) · \(index + 1)").tag(display.id)
                         }
                     }.labelsHidden()
                 } else { Text(selected.name).font(.system(size: 12, weight: .medium)) }
                 Spacer()
-                Text("외부 모니터").font(.system(size: 10)).foregroundStyle(.tertiary)
+                Text(model.text("External display")).font(.system(size: 10)).foregroundStyle(.tertiary)
             }.padding(12).background(.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 11))
-            controlCard(.volume, title: "볼륨", symbol: "speaker.wave.2.fill", step: model.volumeStep)
-            controlCard(.brightness, title: "밝기", symbol: "sun.max.fill", step: model.brightnessStep)
+            controlCard(.volume, title: model.text("Volume"), symbol: "speaker.wave.2.fill", mode: model.volumeMode)
+            controlCard(.brightness, title: model.text("Brightness"), symbol: "sun.max.fill", mode: model.brightnessMode)
             HStack(spacing: 8) {
                 Button { model.toggleMute() } label: {
-                    Label(selected.levels[.volume]?.current == 0 ? "음소거 해제" : "음소거", systemImage: selected.levels[.volume]?.current == 0 ? "speaker.wave.2" : "speaker.slash")
+                    Label(selected.levels[.volume]?.current == 0 ? model.text("Unmute") : model.text("Mute"), systemImage: selected.levels[.volume]?.current == 0 ? "speaker.wave.2" : "speaker.slash")
                         .font(.system(size: 11)).frame(maxWidth: .infinity).padding(12)
                         .background(.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
                 }.buttonStyle(.plain).disabled(selected.levels[.volume] == nil)
                 Button { model.scan() } label: {
-                    Label("다시 검색", systemImage: "arrow.clockwise")
+                    Label(model.text("Scan again"), systemImage: "arrow.clockwise")
                         .font(.system(size: 11)).frame(maxWidth: .infinity).padding(12)
                         .background(.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
                 }.buttonStyle(.plain)
@@ -80,15 +86,15 @@ struct PanelView: View {
         } else {
             VStack(spacing: 14) {
                 Image(systemName: "display.trianglebadge.exclamationmark").font(.system(size: 42)).foregroundStyle(monitorAccent.opacity(0.7))
-                Text("모니터를 연결해 주세요").font(.system(size: 16, weight: .semibold))
-                Text("Apple Silicon Mac에서 DDC/CI를 지원하는 외부 모니터를 연결하면 볼륨과 밝기를 조절할 수 있어요.")
+                Text(model.text("Connect your monitor")).font(.system(size: 16, weight: .semibold))
+                Text(model.text("Connect a DDC/CI monitor to your Apple Silicon Mac to control volume and brightness."))
                     .font(.system(size: 12)).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                Button("다시 검색") { model.scan() }.buttonStyle(.borderedProminent)
+                Button(model.text("Scan again")) { model.scan() }.buttonStyle(.borderedProminent)
             }.padding(20).frame(maxWidth: .infinity, minHeight: 290)
         }
     }
 
-    private func controlCard(_ control: Control, title: String, symbol: String, step: Int) -> some View {
+    private func controlCard(_ control: Control, title: String, symbol: String, mode: AdjustmentMode) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Label(title, systemImage: symbol).font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
@@ -108,12 +114,12 @@ struct PanelView: View {
                     stepButton(control, up: true, title: title)
                 }
                 HStack {
-                    Text("한 번에 \(step)씩").font(.system(size: 10)).foregroundStyle(.secondary)
+                    Text(mode == .fine ? model.text("{0} per press", "1") : model.text("16 steps")).font(.system(size: 10)).foregroundStyle(.secondary)
                     Spacer()
-                    Text(control == .volume ? "소리도 섬세하게" : "눈이 편안한 만큼").font(.system(size: 10)).foregroundStyle(.tertiary)
+                    Text(control == .volume ? model.text("Sound, finely tuned") : model.text("Comfort for your eyes")).font(.system(size: 10)).foregroundStyle(.tertiary)
                 }
             } else {
-                Text("이 모니터에서 값을 읽지 못했어요. 모니터의 DDC/CI 설정과 연결을 확인해 주세요.")
+                Text(model.text("Could not read this control. Check the monitor’s DDC/CI setting and connection."))
                     .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
         }.padding(16)
@@ -125,21 +131,21 @@ struct PanelView: View {
         Button { model.step(control, up: up) } label: {
             Image(systemName: up ? "plus" : "minus").font(.system(size: 12, weight: .semibold))
                 .frame(width: 28, height: 28).background(monitorAccent.opacity(0.09), in: RoundedRectangle(cornerRadius: 8))
-        }.buttonStyle(.plain).foregroundStyle(monitorAccent).accessibilityLabel(title + (up ? " 높이기" : " 낮추기"))
+        }.buttonStyle(.plain).foregroundStyle(monitorAccent).accessibilityLabel(model.text(up ? "Increase {0}" : "Decrease {0}", title))
     }
 
     @ViewBuilder private var keyboardStatus: some View {
         if model.conflict {
-            note("MonitorControl이 실행 중이에요", detail: "키보드 제어가 겹치지 않도록 MonitorControl을 종료하면 Monitor가 볼륨 키를 연결해요.", symbol: "keyboard.badge.ellipsis")
+            note(model.text("MonitorControl is running"), detail: model.text("Quit MonitorControl to let Monitor handle your media keys without conflicts."), symbol: "keyboard.badge.ellipsis")
         } else if !model.trusted && (model.volumeKeys || model.brightnessKeys) {
             VStack(alignment: .leading, spacing: 10) {
-                note("키보드로 더 편하게", detail: "시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용에서 Monitor를 허용해 주세요.", symbol: "keyboard")
-                Button("손쉬운 사용 설정 열기") { model.openAccessibility() }.buttonStyle(.borderless).font(.system(size: 11))
+                note(model.text("Better with your keyboard"), detail: model.text("Enable Monitor in System Settings → Privacy & Security → Accessibility."), symbol: "keyboard")
+                Button(model.text("Open accessibility settings")) { model.openAccessibility() }.buttonStyle(.borderless).font(.system(size: 11))
             }
         } else if (model.volumeKeys || model.brightnessKeys) && !model.keysActive {
-            note("키보드 연결을 확인해 주세요", detail: "손쉬운 사용 권한을 확인한 뒤 Monitor를 다시 실행해 주세요. 슬라이더는 바로 사용할 수 있어요.", symbol: "keyboard")
+            note(model.text("Check the keyboard connection"), detail: model.text("Check Accessibility permission, then restart Monitor. You can use the sliders now."), symbol: "keyboard")
         } else {
-            Label(model.volumeKeys ? "볼륨 키 · 한 번에 \(model.volumeStep)씩" : "키보드 제어 꺼짐", systemImage: "keyboard")
+            Label(keyboardSummary, systemImage: "keyboard")
                 .font(.system(size: 11)).foregroundStyle(.secondary).padding(.horizontal, 2)
         }
     }
@@ -151,31 +157,45 @@ struct PanelView: View {
     }
     private var preferences: some View {
         VStack(alignment: .leading, spacing: 18) {
-            stepPicker("볼륨 조절 간격", selection: $model.volumeStep)
-            stepPicker("밝기 조절 간격", selection: $model.brightnessStep)
-            Text("모니터의 실제 숫자를 기준으로 조절해요. Shift + Option을 누르면 언제나 1씩 움직여요.")
+            VStack(alignment: .leading, spacing: 8) {
+                Picker(model.text("Language"), selection: $model.language) {
+                    ForEach(AppLanguage.allCases) { language in
+                        Text(language == .system ? model.text("Follow system") : language.nativeName).tag(language)
+                    }
+                }.accessibilityIdentifier("language-picker")
+                Text(model.text("Changes apply immediately and stay saved after restarting Monitor."))
+                    .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Divider()
+            modePicker(model.text("Volume adjustment"), selection: $model.volumeMode)
+            modePicker(model.text("Brightness adjustment"), selection: $model.brightnessMode)
+            Text(model.text("Hold Shift + Option for a 1-unit adjustment in either mode."))
                 .font(.system(size: 11)).foregroundStyle(.secondary)
             Divider()
-            Toggle("키보드 볼륨 키 사용", isOn: $model.volumeKeys).toggleStyle(.switch)
-            Toggle("키보드 밝기 키 사용", isOn: $model.brightnessKeys).toggleStyle(.switch)
-            Text("선택한 외부 모니터에 적용돼요. 밝기 키를 끄면 Mac의 기본 밝기 조절을 유지해요.")
+            Toggle(model.text("Use keyboard volume keys"), isOn: $model.volumeKeys).toggleStyle(.switch)
+            Toggle(model.text("Use keyboard brightness keys"), isOn: $model.brightnessKeys).toggleStyle(.switch)
+            Text(model.text("Keys control the selected external monitor. Disable brightness keys to keep Mac’s normal brightness control."))
                 .font(.system(size: 11)).foregroundStyle(.secondary)
             keyboardStatus
             Divider()
-            Toggle("로그인할 때 실행", isOn: Binding(get: { model.loginEnabled }, set: model.setLogin)).toggleStyle(.switch)
+            Toggle(model.text("Launch at login"), isOn: Binding(get: { model.loginEnabled }, set: model.setLogin)).toggleStyle(.switch)
             HStack {
-                Text("Monitor \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0")").foregroundStyle(.secondary)
+                Text("Monitor \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.2.0")").foregroundStyle(.secondary)
                 Spacer()
                 Link("GitHub ↗", destination: URL(string: "https://github.com/doumAb180/monitor-control")!)
             }.font(.system(size: 11))
         }.font(.system(size: 12))
     }
-    private func stepPicker(_ title: String, selection: Binding<Int>) -> some View {
+    private func modePicker(_ title: String, selection: Binding<AdjustmentMode>) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
             Picker(title, selection: selection) {
-                ForEach([1, 2, 5, 10], id: \.self) { Text("\($0)").tag($0) }
+                ForEach(AdjustmentMode.allCases) { mode in
+                    Text(model.text(mode == .fine ? "Fine" : "Standard")).tag(mode)
+                }
             }.pickerStyle(.segmented).labelsHidden()
+            Text(model.text(selection.wrappedValue == .fine ? "Exactly 1 per press." : "16 steps across the range, like macOS volume keys."))
+                .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
     }
     private var footer: some View {
@@ -188,10 +208,33 @@ struct PanelView: View {
                 Spacer(minLength: 0)
             }.frame(minHeight: 28, alignment: .topLeading)
             HStack {
-                Text("작은 조절, 큰 편안함.")
+                Text(model.text("Small adjustments. Big comfort."))
                 Spacer()
-                Button("종료") { NSApp.terminate(nil) }.buttonStyle(.plain)
+                quitButton
             }.font(.system(size: 10)).foregroundStyle(.tertiary)
         }
+    }
+
+    private var keyboardSummary: String {
+        if model.volumeKeys {
+            return model.text("Volume keys · {0}", model.text(model.volumeMode == .fine ? "Fine" : "Standard"))
+        }
+        if model.brightnessKeys {
+            return model.text("Brightness keys · {0}", model.text(model.brightnessMode == .fine ? "Fine" : "Standard"))
+        }
+        return model.text("Keyboard control is off")
+    }
+
+    private var quitButton: some View {
+        Button { NSApp.terminate(nil) } label: {
+            Label(model.text("Quit Monitor"), systemImage: "power")
+                .font(.system(size: 11, weight: .medium)).foregroundStyle(.primary)
+                .padding(.horizontal, 11).padding(.vertical, 8)
+                .background(quitHovered ? monitorAccent.opacity(0.14) : .primary.opacity(0.065), in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.primary.opacity(0.14)))
+                .contentShape(RoundedRectangle(cornerRadius: 8))
+        }.buttonStyle(.plain).onHover { quitHovered = $0 }
+            .help(model.text("Quit Monitor")).keyboardShortcut("q", modifiers: .command)
+            .accessibilityIdentifier("quit-monitor")
     }
 }

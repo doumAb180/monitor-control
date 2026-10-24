@@ -3,6 +3,11 @@ public enum Control: UInt8, CaseIterable, Hashable, Sendable {
     case brightness = 0x10
 }
 
+public enum AdjustmentMode: String, CaseIterable, Identifiable, Sendable {
+    case fine, standard
+    public var id: String { rawValue }
+}
+
 public struct Level: Equatable, Sendable {
     public var current: Int
     public let maximum: Int
@@ -12,6 +17,13 @@ public struct Level: Equatable, Sendable {
     }
     public func stepped(up: Bool, by step: Int) -> Int {
         min(maximum, max(0, current + (up ? 1 : -1) * max(1, step)))
+    }
+    public func stepped(up: Bool, mode: AdjustmentMode) -> Int {
+        guard mode == .standard else { return stepped(up: up, by: 1) }
+        // Round 16 evenly spaced stops to real hardware units. Find a strictly
+        // different stop so off-grid values (e.g. 6/100) never get stuck.
+        let stops = (0...16).map { Int((Double(maximum) * Double($0) / 16).rounded()) }
+        return up ? (stops.first { $0 > current } ?? maximum) : (stops.last { $0 < current } ?? 0)
     }
 }
 

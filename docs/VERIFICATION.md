@@ -1,4 +1,22 @@
-# v0.1.0 verification
+# Verification
+
+## v0.2.0
+
+- Eleven XCTest cases passed locally: six control/protocol tests and five
+  localization/preferences tests.
+- Standard mode reaches 100 in 16 presses and traverses the same rounded stops
+  in reverse; both modes progress from off-grid values and handle small ranges.
+- Seven translation columns have matching placeholder tokens. Regional system
+  language resolution and English fallback are tested.
+- Language and per-control modes persist without resetting keyboard preferences
+  or display selection. Legacy step settings migrate to the appropriate mode.
+- Existing feedback changes language immediately; literal arguments are not
+  interpreted as format tokens.
+- Korean and German settings and English dark-mode panels were rendered and
+  visually inspected. Quit is now an outlined button with a power icon.
+- Homebrew Cask Ruby syntax and `brew style` passed.
+
+## v0.1.0 hardware baseline
 
 Verified locally on 2026-10-24 (Asia/Seoul):
 
