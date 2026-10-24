@@ -1,6 +1,6 @@
 cask "monitor" do
-  version "0.1.0"
-  sha256 "34d4f4a03a3ee23f9c7838e8b4deed4015c66d61e31e62849ae938c0b20e6155"
+  version "0.2.0"
+  sha256 "9fadc9db112d7a952e33053e32cae810f14753609772aa0c9449e8ac58fe1288"
 
   url "https://github.com/doumAb180/monitor-control/releases/download/v#{version}/Monitor-#{version}-arm64.dmg"
   name "Monitor"
