@@ -3,7 +3,14 @@ import IOKit
 import DDCBridge
 import MonitorCore
 
-final class DisplayDevice: Identifiable {
+protocol MonitorDevice: AnyObject {
+    var id: String { get }
+    var name: String { get }
+    func read(_ control: Control) -> Level?
+    func write(_ control: Control, value: Int) -> Bool
+}
+
+final class DisplayDevice: Identifiable, MonitorDevice {
     let id: String
     let name: String
     let registryID: UInt64

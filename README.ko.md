@@ -33,7 +33,7 @@ Homebrew 공식 기본 저장소 등록이 아닌, 직접 관리하는 tap 배�
 ## DMG로 설치
 
 1. [GitHub Releases](https://github.com/doumAb180/monitor-control/releases)에서
-   `Monitor-0.2.0-arm64.dmg`를 내려받습니다.
+   `Monitor-0.2.1-arm64.dmg`를 내려받습니다.
 2. DMG를 열고 **Monitor.app**을 **Applications** 폴더로 드래그합니다.
 3. Monitor를 실행합니다. 상단 메뉴 막대의 모니터 아이콘을 클릭합니다.
 4. 키보드 제어를 사용하려면 **시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용**에서
@@ -48,7 +48,7 @@ Homebrew 공식 기본 저장소 등록이 아닌, 직접 관리하는 tap 배�
 GitHub CLI로 파일만 내려받을 수도 있습니다:
 
 ```bash
-gh release download v0.2.0 --repo doumAb180/monitor-control --pattern '*.dmg'
+gh release download v0.2.1 --repo doumAb180/monitor-control --pattern '*.dmg'
 ```
 
 ## 기능
@@ -64,8 +64,8 @@ gh release download v0.2.0 --repo doumAb180/monitor-control --pattern '*.dmg'
 - **여러 모니터**: 패널에서 선택한 모니터에 키보드 제어 적용
 - **작은 화면 표시(HUD)**: 키보드로 바꾼 값 표시; 실제 적용 실패는 패널 상태에 표시
 - **로그인 시 실행**: 설정에서 선택
-- **재연결**: 화면 구성 변경·잠자기 복귀 시 다시 검색
-- **응답 확인**: 쓰기 후 실제 값을 다시 읽음; 확인 실패 시 지원되는 것처럼 표시하지 않음
+- **자동 재연결**: 화면 구성 변경·잠자기 복귀 후 모니터나 활성화된 제어를 찾지 못하면 2·4·8·16초 후 재시도하며, 계속 실패하면 30초 간격으로 재시도
+- **응답 확인**: 쓰기 후 실제 값을 다시 읽음. 일시적으로 확인에 실패해도 제어를 유지하고 자동 복구 상태를 표시합니다. 복구 시 실제 값을 읽으며 과거 명령을 재전송하지 않습니다.
 
 ## 지원 범위
 
@@ -109,8 +109,8 @@ bash scripts/build.sh
 
 ```text
 dist/Monitor.app
-dist/Monitor-0.2.0-arm64.dmg
-dist/Monitor-0.2.0-arm64.zip
+dist/Monitor-0.2.1-arm64.dmg
+dist/Monitor-0.2.1-arm64.zip
 dist/*.sha256
 ```
 
@@ -138,7 +138,7 @@ dist/Monitor.app/Contents/MacOS/Monitor --render-preview /tmp/monitor-preview.pn
 ## GitHub 배포
 
 `main`에 푸시하면 테스트 및 DMG 빌드가 실행되고 Actions 아티팩트로 저장됩니다.
-`v0.2.0` 형태의 버전 태그를 푸시하면 테스트 후 **프리릴리스**에 DMG, ZIP, SHA-256을 업로드하고, `main`의 `Casks/monitor.rb`를 해당 DMG의 정확한 체크섬으로 갱신합니다.
+`v0.2.1` 형태의 버전 태그를 푸시하면 테스트 후 **프리릴리스**에 DMG, ZIP, SHA-256을 업로드하고, `main`의 `Casks/monitor.rb`를 해당 DMG의 정확한 체크섬으로 갱신합니다.
 배포 버전은 태그에서 추출되며 잘못된 버전 형식은 빌드가 거부합니다.
 
 ```bash

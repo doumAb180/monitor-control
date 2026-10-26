@@ -29,7 +29,7 @@ brew upgrade --cask doumab180/monitor-control/monitor
 
 ## Install from GitHub
 
-Download `Monitor-0.2.0-arm64.dmg` from [Releases](https://github.com/doumAb180/monitor-control/releases),
+Download `Monitor-0.2.1-arm64.dmg` from [Releases](https://github.com/doumAb180/monitor-control/releases),
 open it, and drag **Monitor.app** into **Applications**. A ZIP and SHA-256 checksums
 are also provided.
 
@@ -62,7 +62,8 @@ one-unit adjustment in either mode. Sliders always use individual hardware units
 - Mute sets volume to zero and restores the last nonzero value remembered during
   this session. If no prior value is known, unmute starts at 1.
 - The HUD shows the requested value; the panel reports any readback mismatch.
-- The app scans again after display changes and sleep/wake.
+- The app scans again after display changes and sleep/wake. Missing monitors or
+  enabled controls are retried automatically after 2, 4, 8, 16, then every 30 seconds.
 - Settings include launch at login.
 
 ## Language
@@ -88,8 +89,11 @@ Uninstalling with Homebrew's `--zap` removes preferences.
 - A monitor that ignores values or only accepts larger steps cannot be forced
   to support one-unit adjustments.
 - Uses Apple's private IOAVService API; future macOS versions may require fixes.
-- Hardware writes are verified by reading the resulting value. Failed reads
-  disable that control until the next scan rather than inventing a value.
+- Hardware writes are verified by reading the resulting value. A failed readback
+  keeps the control available and marks the value as unconfirmed while reconnecting
+  automatically. Recovery reads the actual value and never replays old writes.
+  Healthy controls remain usable during recovery; an absent monitor is removed
+  when rediscovery confirms it is no longer available.
 - Changes made by other apps are not polled continuously. Use **Scan again** to sync.
 - MonitorControl is detected, but not every competing media-key app is detected.
 
@@ -123,7 +127,7 @@ See [verification notes](docs/VERIFICATION.md) for checks performed and manual c
 
 ## Releases and Homebrew
 
-GitHub Actions tests and builds pushes to `main` and pull requests. A `v0.2.0`-style
+GitHub Actions tests and builds pushes to `main` and pull requests. A `v0.2.1`-style
 tag publishes a prerelease with the DMG, ZIP and checksums, then updates
 `Casks/monitor.rb` on `main` using the SHA-256 of that exact published DMG.
 

@@ -1,5 +1,22 @@
 # Verification
 
+## v0.2.1
+
+Verified locally on 2026-10-27 (Asia/Seoul):
+
+- All 18 XCTest cases passed (seven recovery, five localization, six core).
+- Release build, ad-hoc signature verification, and DMG verification passed.
+- Read-only hardware probe on LG HDR 4K returned volume 10/100 and brightness
+  100/100. No hardware values were changed during this verification.
+
+- Added seven simulated-device regression tests covering failed readback without
+  losing keyboard/mute controls, reopening the service without replaying writes,
+  partial startup discovery, delayed wake, disconnect/reconnect, newer input
+  arriving during recovery, sleep during recovery, and capped retry backoff.
+- Recovery reads only missing/failed controls and preserves healthy controls.
+- Actual cable removal and sleep/wake on the installed release still require
+  real-world validation; simulated tests do not establish hardware reliability.
+
 ## v0.2.0
 
 - Eleven XCTest cases passed locally: six control/protocol tests and five
